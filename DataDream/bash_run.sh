@@ -3,28 +3,19 @@ GPU="$1"
 SET_SPLIT=5
 SPLIT_IDX="$2"
 
-N_SHOT=16
-NUM_TRAIN_EPOCH=20
-
+### ------------------
+### Parameters
+### ------------------
 DATASET="eurosat"
 N_CLS=10
 FEWSHOT_SEED="seed0"
+N_SHOT=16
+NUM_TRAIN_EPOCH=200
 
 
-# for DATASET in "${DATASETS[@]}"; do
-#     for FEWSHOT_SEED in "${FEWSHOT_SEEDS[@]}"; do
-#     done
-# done
-
-
-# for FEWSHOT_SEED in "${FEWSHOT_SEEDS[@]}"; do
-
-# for i in "${!DATASETS[@]}"; do
-# DATASET=${DATASETS[i]}
-# N_CLS=${N_CLSS[i]}
-
-
-# Calculate CLASS_IDXS
+### ------------------
+### Calculate CLASS_IDXS 
+### ------------------
 START_RANGE=$(( (N_CLS / SET_SPLIT) * SPLIT_IDX))
 END_RANGE=$(( (N_CLS / SET_SPLIT) * (SPLIT_IDX + 1) - 1 ))
 
@@ -37,10 +28,12 @@ fi
 
 CLASS_IDXS=($(seq $START_RANGE $FINAL_END_RANGE))
 
+
+### ------------------
+### Run
+### ------------------
 for CLASS_IDX in "${CLASS_IDXS[@]}"; do
 
-# Run
-# echo "DATASET $DATASET, SEED $FEWSHOT_SEED, CLASS IDX $CLASS_IDX"
 CUDA_VISIBLE_DEVICES=$GPU, accelerate launch datadream.py \
 --dataset=$DATASET \
 --n_template=1 \
