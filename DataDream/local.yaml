@@ -1,0 +1,4 @@
+instance_data_dir: /shared-local/jkim32/data/{}/real_train_fewshot
+
+model_dir: 
+    sd2.1: /shared-local/jkim32/huggingface/diffusers/models--stabilityai--stable-diffusion-2-1-base/snapshots/1f758383196d38df1dfe523ddb1030f2bfab7741
