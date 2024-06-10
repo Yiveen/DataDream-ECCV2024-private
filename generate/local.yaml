@@ -1,0 +1,5 @@
+
+save_dir: /shared-local/jkim32/data
+datadream_dir: /shared-local/jkim32/Documents/DataDream-ECCV2024/DataDream/outputs
+model_dir: 
+    sd2.1: /shared-local/jkim32/huggingface/diffusers/models--stabilityai--stable-diffusion-2-1-base/snapshots/1f758383196d38df1dfe523ddb1030f2bfab7741
