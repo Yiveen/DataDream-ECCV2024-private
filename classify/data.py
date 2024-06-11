@@ -75,11 +75,15 @@ def get_transforms(model_type):
     return train_transform, test_transform
 
 
-class DatasetFromMetadata(Dataset):
+class ImageNetDatasetFromMetadata(Dataset):
     def __init__(
-        self, data_root, metadata_root, transform, proxy, 
-        load_image_id=False,
-        target_label=None, n_img_per_cls=None,
+        self, 
+        data_root, 
+        metadata_root, 
+        transform, 
+        proxy, 
+        target_label=None, 
+        n_img_per_cls=None,
         dataset="imagenet",
         n_shot=0,
         real_train_fewshot_data_dir='',
@@ -90,16 +94,11 @@ class DatasetFromMetadata(Dataset):
         self.transform = transform
         self.image_ids = get_image_ids(self.metadata, proxy=proxy)
         self.image_labels = get_class_labels(self.metadata)
-        self.load_image_id = load_image_id
         self.is_pooled_fewshot = is_pooled_fewshot
         
         if not is_pooled_fewshot:
             """ full data """
-
             if n_img_per_cls is not None:
-    #             value_counts = Counter(self.image_labels.values())
-    #             for k in value_counts.keys():
-    #                 value_counts[k] = 0
                 value_counts = defaultdict(int)
 
                 tmp = {}
@@ -150,10 +149,7 @@ class DatasetFromMetadata(Dataset):
             image = self.get_data(self.image_paths[idx])
             image_label = self.image_labels[idx]
         image = self.transform(image)
-        if self.load_image_id:
-            return image, image_label, image_id
-        else:
-            return image, image_label
+        return image, image_label
 
     def __len__(self):
         if not self.is_pooled_fewshot:
@@ -165,16 +161,19 @@ class DatasetFromMetadata(Dataset):
 class DatasetSynthImage(Dataset):
     def __init__(
         self, 
-        synth_train_data_dir, transform, load_image_id=False, 
-        target_label=None, n_img_per_cls=None,
-        dataset='imagenet', n_shot=0,
-        real_train_fewshot_data_dir='', is_pooled_fewshot=False, get_idx=False, **kwargs
+        synth_train_data_dir, 
+        transform, 
+        target_label=None, 
+        n_img_per_cls=None,
+        dataset='imagenet', 
+        n_shot=0,
+        real_train_fewshot_data_dir='', 
+        is_pooled_fewshot=False, 
+        **kwargs
     ):
         self.synth_train_data_dir = synth_train_data_dir
         self.transform = transform
-        self.load_image_id = load_image_id
         self.is_pooled_fewshot = is_pooled_fewshot
-        self.get_idx = get_idx
         
         self.image_paths = []
         self.image_labels = []
@@ -223,10 +222,6 @@ class DatasetSynthImage(Dataset):
         image = self.transform(image)
         is_real = "real_train" in image_path
 
-        if self.get_idx:
-            return image, image_label, idx
-        elif self.load_image_id:
-            return image, image_label, image_path
         elif self.is_pooled_fewshot:
             return image, image_label, is_real
         else:
@@ -512,7 +507,6 @@ def get_data_loader(
     bs=32, 
     eval_bs=32,
     is_rand_aug=True,
-    load_image_id=False,
     target_label=None,
     n_img_per_cls=None,
     is_synth_train=False,
@@ -527,14 +521,12 @@ def get_data_loader(
     if is_synth_train:
         train_loader = None
     else:
-#         if dataset in ('imagenet', "imagenet_100") or is_pooled_fewshot:
-        if dataset in ('imagenet', "imagenet_100"):
-            train_dataset = DatasetFromMetadata(
+        if dataset == 'imagenet':
+            train_dataset = ImageNetDatasetFromMetadata(
                 data_root=real_train_data_dir,
                 metadata_root=ospj(metadata_dir, 'train'),
                 transform=train_transform if is_rand_aug else test_transform,
                 proxy=False,
-                load_image_id=load_image_id,
                 target_label=target_label,
                 n_img_per_cls=n_img_per_cls,
                 dataset=dataset,
@@ -622,13 +614,16 @@ def get_data_loader(
             prefetch_factor=4, pin_memory=True,
             num_workers=16)
 
-    if dataset in ('imagenet', "imagenet_100"):
+#####################################################
+#####################################################
+#####################################################
+
+    if dataset == 'imagenet':
         test_dataset = DatasetFromMetadata(
             data_root=real_test_data_dir,
             metadata_root=ospj(metadata_dir, 'test'),
             transform=test_transform,
             proxy=False,
-            load_image_id=load_image_id,
             target_label=target_label,
             dataset=dataset,
         )
@@ -705,7 +700,6 @@ def get_data_loader(
 
 def get_synth_train_data_loader(
     synth_train_data_dir="data_synth",
-    load_image_id=False,
     bs=32, 
     is_rand_aug=True,
     target_label=None,
@@ -715,7 +709,6 @@ def get_synth_train_data_loader(
     real_train_fewshot_data_dir='',
     is_pooled_fewshot=False,
     model_type=None,
-    get_idx=False,
 ):
 
     train_transform, test_transform = get_transforms(model_type)
@@ -723,14 +716,12 @@ def get_synth_train_data_loader(
     train_dataset = DatasetSynthImage(
         synth_train_data_dir=synth_train_data_dir, 
         transform=train_transform if is_rand_aug else test_transform,
-        load_image_id=load_image_id,
         target_label=target_label,
         n_img_per_cls=n_img_per_cls,
         dataset=dataset,
         n_shot=n_shot,
         real_train_fewshot_data_dir=real_train_fewshot_data_dir,
         is_pooled_fewshot=is_pooled_fewshot,
-        get_idx=get_idx,
     ) 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=bs, 
