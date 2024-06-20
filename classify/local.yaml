@@ -1,15 +1,15 @@
-wandb_key: b52e9ac2a70a48f9091d5b7387be4a897f218ef7
-clip_download_dir: /shared-local/jkim32/clip
-metadata_dir: metadata/imagenet
+wandb_key: 69c26cd17e0bb8b19fa95f247367679de9a43ed9
+clip_download_dir: /home/yliu/projects/DataDream-ECCV2024-private/classify/CLIP
+metadata_dir: metadata/tinyimagenet
 
-data_dir: /shared-local/jkim32/data
+data_dir: /shared-network/yliu/projects/disef/fine-tune/data/
 
 real_train_data_dir:
-    eurosat: /shared-local/jbader40/data/eurosat/EuroSAT
+    tinyimagenet: /shared-network/yliu/projects/disef/fine-tune/data/tinyimagenet
 
-real_train_fewshot_data_dir: /shared-local/jkim32/data/{}/real_train_fewshot
+real_train_fewshot_data_dir: /shared-network/yliu/projects/disef/fine-tune/selected_fewshots/tinyimagenet/seed_5
 
-synth_train_data_dir: /shared-local/jkim32/data
+synth_train_data_dir: /shared-network/yliu/projects/disef/generation/output/tinyimagenet-realistic-step5/seed_5
 
-generative_model:
-            sd2.1: /shared-local/jkim32/huggingface/diffusers/models--stabilityai--stable-diffusion-2-1-base/snapshots/1f758383196d38df1dfe523ddb1030f2bfab7741
+# generative_model:
+#             sd2.1: /home/yliu/projects/diffuser/stable-diffusion-2-1-base

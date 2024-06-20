@@ -18,11 +18,15 @@ from util_data import (
     configure_metadata, get_image_ids, get_class_labels,
     GaussianBlur, Solarization,
 )
+from torch.utils.data.distributed import DistributedSampler
 
 NORM_MEAN = (0.485, 0.456, 0.406)
 NORM_STD = (0.229, 0.224, 0.225)
 CLIP_NORM_MEAN = (0.48145466, 0.4578275, 0.40821073)
 CLIP_NORM_STD = (0.26862954, 0.26130258, 0.27577711)
+
+# tinyimagenet_clstext2index = {n01443537, n01629819, n01641577, n01644900, n01698640, n01742172, n01768244, n01770393, n01774384, n01774750, n01784675, n01855672, n01882714, n01910747, n01917289, n01944390, n01945685, n01950731, n01983481, n01984695, n02002724, n02056570}
+# tinyimagenet_clstext2notation = {}
 
 def get_transforms(model_type):
 
@@ -90,10 +94,10 @@ class ImageNetDatasetFromMetadata(Dataset):
         is_pooled_fewshot=False,
     ):
         self.data_root = data_root
-        self.metadata = configure_metadata(metadata_root)
+        self.metadata = configure_metadata(metadata_root) #设置那几个txt
         self.transform = transform
-        self.image_ids = get_image_ids(self.metadata, proxy=proxy)
-        self.image_labels = get_class_labels(self.metadata)
+        self.image_ids = get_image_ids(self.metadata, proxy=proxy) # 图片路径的list
+        self.image_labels = get_class_labels(self.metadata) #dict， key是图片路径，value是类别
         self.is_pooled_fewshot = is_pooled_fewshot
         
         if not is_pooled_fewshot:
@@ -118,7 +122,90 @@ class ImageNetDatasetFromMetadata(Dataset):
             """ only fewshot data """
             self.image_paths = []
             self.image_labels = []
-            reps = round(n_img_per_cls // n_shot)
+            reps = round(n_img_per_cls // n_shot) #重复的次数
+            for label, class_name in enumerate(SUBSET_NAMES[dataset]):
+                real_img_paths = os.listdir(
+                    ospj(real_train_fewshot_data_dir, class_name))
+                real_subset = [
+                    ospj(
+                        real_train_fewshot_data_dir, 
+                        class_name, 
+                        real_img_paths[i]
+                    ) for i in range(n_shot)
+                ]
+                for i in range(reps):
+                    self.image_paths.extend(real_subset)
+                    self.image_labels.extend([label] * n_shot)
+
+
+    def get_data(self, fpath):
+        x = Image.open(fpath)
+        x = x.convert('RGB')
+        return x
+            
+    def __getitem__(self, idx):
+        if not self.is_pooled_fewshot: # full data
+            image_id = self.image_ids[idx]
+            image = self.get_data(ospj(self.data_root, image_id))
+            image_label = self.image_labels[image_id]
+        else: # few-shot
+            image_id = self.image_paths[idx]
+            image = self.get_data(self.image_paths[idx])
+            image_label = self.image_labels[idx]
+        image = self.transform(image)
+        return image, image_label
+
+    def __len__(self):
+        if not self.is_pooled_fewshot:
+            return len(self.image_ids)
+        else:
+            return len(self.image_paths)
+        
+        
+class TinyImageNetDatasetFromMetadata(Dataset):
+    def __init__(
+        self, 
+        data_root, 
+        metadata_root, 
+        transform, 
+        proxy, 
+        target_label=None, 
+        n_img_per_cls=None,
+        dataset="tinyimagenet",
+        n_shot=0,
+        real_train_fewshot_data_dir='',
+        is_pooled_fewshot=False,
+    ):
+        self.data_root = data_root
+        self.metadata = configure_metadata(metadata_root)
+        self.transform = transform
+        self.image_ids = get_image_ids(self.metadata, proxy=False)
+        self.image_labels = get_class_labels(self.metadata)
+        self.is_pooled_fewshot = is_pooled_fewshot
+        
+        if not is_pooled_fewshot: #True
+            """ full data """
+            if n_img_per_cls is not None:
+                value_counts = defaultdict(int)
+
+                tmp = {}
+                for k, v in self.image_labels.items():
+                    if value_counts[v] < n_img_per_cls:
+                        tmp[k] = v
+                        value_counts[v] += 1
+                self.image_labels = tmp
+
+            if target_label is not None:
+                self.image_labels = {k: v for k, v in self.image_labels.items() 
+                                     if v == target_label}
+
+            self.image_ids = list(self.image_labels.keys())
+
+        else:
+            """ only fewshot data """
+            self.image_paths = []
+            self.image_labels = []
+            reps = round(n_img_per_cls // n_shot) #重复的次数
             for label, class_name in enumerate(SUBSET_NAMES[dataset]):
                 real_img_paths = os.listdir(
                     ospj(real_train_fewshot_data_dir, class_name))
@@ -157,7 +244,6 @@ class ImageNetDatasetFromMetadata(Dataset):
         else:
             return len(self.image_paths)
 
-
 class DatasetSynthImage(Dataset):
     def __init__(
         self, 
@@ -172,6 +258,7 @@ class DatasetSynthImage(Dataset):
         **kwargs
     ):
         self.synth_train_data_dir = synth_train_data_dir
+        # print(self.synth_train_data_dir)
         self.transform = transform
         self.is_pooled_fewshot = is_pooled_fewshot
         
@@ -213,16 +300,21 @@ class DatasetSynthImage(Dataset):
                 for i in range(reps):
                     self.image_paths.extend(real_subset)
                     self.image_labels.extend([label] * n_shot)
+
                 
     def __getitem__(self, idx):
         image_path = self.image_paths[idx]
+        # if idx == 0:
+        #     print('image_path0', self.image_paths)
+        #     print(len(self.image_paths))
         image_label = self.image_labels[idx]
         image = Image.open(image_path)
         image = image.convert('RGB')
+        # image = image.resize((64, 64), Image.Resampling.LANCZOS)  # Resize the image to 64x64
         image = self.transform(image)
-        is_real = "real_train" in image_path
+        is_real = "selected_fewshots" in image_path #我们选择的真实图片路径要有real_train
 
-        elif self.is_pooled_fewshot:
+        if self.is_pooled_fewshot:
             return image, image_label, is_real
         else:
             return image, image_label
@@ -514,6 +606,8 @@ def get_data_loader(
     real_train_fewshot_data_dir='',
     is_pooled_fewshot=False,
     model_type=None,
+    rank=None,
+    world_size=None,
 ):
 
     train_transform, test_transform = get_transforms(model_type)
@@ -523,6 +617,19 @@ def get_data_loader(
     else:
         if dataset == 'imagenet':
             train_dataset = ImageNetDatasetFromMetadata(
+                data_root=real_train_data_dir,
+                metadata_root=ospj(metadata_dir, 'train'),
+                transform=train_transform if is_rand_aug else test_transform,
+                proxy=False,
+                target_label=target_label,
+                n_img_per_cls=n_img_per_cls,
+                dataset=dataset,
+                n_shot=n_shot,
+                real_train_fewshot_data_dir=real_train_fewshot_data_dir,
+                is_pooled_fewshot=is_pooled_fewshot,
+            )
+        if dataset == 'tinyimagenet':
+            train_dataset = TinyImageNetDatasetFromMetadata(
                 data_root=real_train_data_dir,
                 metadata_root=ospj(metadata_dir, 'train'),
                 transform=train_transform if is_rand_aug else test_transform,
@@ -607,6 +714,7 @@ def get_data_loader(
                                         dataset_name=dataset)
         else:
             raise ValueError("Please specify a valid dataset.")
+        
         train_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=bs, 
             sampler=None,
@@ -619,7 +727,7 @@ def get_data_loader(
 #####################################################
 
     if dataset == 'imagenet':
-        test_dataset = DatasetFromMetadata(
+        test_dataset = ImageNetDatasetFromMetadata(
             data_root=real_test_data_dir,
             metadata_root=ospj(metadata_dir, 'test'),
             transform=test_transform,
@@ -627,6 +735,15 @@ def get_data_loader(
             target_label=target_label,
             dataset=dataset,
         )
+    elif dataset == 'tinyimagenet':
+        test_dataset = TinyImageNetDatasetFromMetadata(
+            data_root=real_test_data_dir,
+            metadata_root=ospj(metadata_dir, 'test'),
+            transform=test_transform,
+            proxy=False,
+            target_label=target_label,
+            dataset=dataset,
+        )    
     # TODO: update arguments
     elif dataset == 'pets':
         test_dataset = split_pets(real_train_data_dir, test_transform, 'test')
@@ -693,7 +810,7 @@ def get_data_loader(
         raise ValueError("Please specify a valid dataset.")
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=eval_bs, shuffle=False, 
-        num_workers=16, pin_memory=True)
+        num_workers=16, pin_memory=True, sampler=None)
 
     return train_loader, test_loader
 
@@ -710,7 +827,6 @@ def get_synth_train_data_loader(
     is_pooled_fewshot=False,
     model_type=None,
 ):
-
     train_transform, test_transform = get_transforms(model_type)
 
     train_dataset = DatasetSynthImage(
@@ -723,12 +839,14 @@ def get_synth_train_data_loader(
         real_train_fewshot_data_dir=real_train_fewshot_data_dir,
         is_pooled_fewshot=is_pooled_fewshot,
     ) 
+    
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=bs, 
         sampler=None,
         shuffle=is_rand_aug,
         num_workers=16, pin_memory=True,
     )
+    
     return train_loader
 
 

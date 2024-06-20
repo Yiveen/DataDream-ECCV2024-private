@@ -87,14 +87,17 @@ def set_local(args):
 
     args.data_dir = args_local["data_dir"]
     args.real_train_data_dir = args_local["real_train_data_dir"][args.dataset]
+    # args.real_train_fewshot_data_dir = ospj(
+    #     args_local["real_train_fewshot_data_dir"].format(args.dataset), 
+    #     args.fewshot_seed
+    # )
     args.real_train_fewshot_data_dir = ospj(
-        args_local["real_train_fewshot_data_dir"].format(args.dataset), 
-        args.fewshot_seed
+        args_local["real_train_fewshot_data_dir"].format(args.dataset)
     )
     args.real_test_data_dir = ospj(args.data_dir, args.dataset)
     args.synth_train_data_dir = args_local["synth_train_data_dir"]
     args.metadata_dir = args_local["metadata_dir"]
-    args.sd_model_dir = args_local["generative_model"][args.sd_version]
+    # args.sd_model_dir = args_local["generative_model"][args.sd_version]
     args.clip_download_dir = args_local["clip_download_dir"]
     args.wandb_key = args_local["wandb_key"]
 
@@ -146,14 +149,14 @@ def set_synth_train_data_dir(args):
                 mid_dir += "_notextlora"
             if args.is_dataset_wise:
                 mid_dir += "_dswise"
-        args.synth_train_data_dir = ospj(
-            args.synth_train_data_dir,
-            args.dataset,
-            args.sd_version, 
-            f"gs{args.guidance_scale}_nis{args.num_inference_steps}",
-            mid_dir, 
-            "train",
-        ) 
+        # args.synth_train_data_dir = ospj(
+        #     args.synth_train_data_dir,
+        #     args.dataset,
+        #     args.sd_version, 
+        #     f"gs{args.guidance_scale}_nis{args.num_inference_steps}",
+        #     mid_dir, 
+        #     "train",
+        # ) 
 
 
 def set_log(output_dir):

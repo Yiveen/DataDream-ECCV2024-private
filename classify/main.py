@@ -13,6 +13,9 @@ from os.path import join as ospj
 import wandb
 
 import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp  # 正确导入mp
+from torch.utils.data.distributed import DistributedSampler
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from torchvision.transforms import v2
@@ -28,6 +31,8 @@ from data import get_data_loader, get_synth_train_data_loader
 from models.clip import CLIP
 from models.resnet50 import ResNet50
 from util_data import SUBSET_NAMES
+
+from torch.multiprocessing import Process
 
 
 
@@ -64,8 +69,10 @@ def load_synth_train_data_loader(args):
     return synth_train_loader
 
 
+
 def main(args):
-    args.n_classes = len(SUBSET_NAMES[args.dataset])
+    # setup_distributed(rank, world_size)
+    args.n_classes = len(SUBSET_NAMES[args.dataset])  #这里需要修改为有多少个类写多少个类
 
     os.makedirs(args.output_dir, exist_ok=True)
 
@@ -97,8 +104,19 @@ def main(args):
     elif args.model_type == "resnet50": 
         model = ResNet50(n_classes=args.n_classes)
         params_groups = model.parameters()
-
-    model = model.cuda()
+        
+    # for name, module in model.named_modules():
+    #     print(name, module)
+    
+    # model.cuda(rank)
+    # model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
+    
+    model = model.cuda('cuda:0')
+    # # model = nn.DataParallel(model, device_ids=[1, 2, 3, 4, 5, 6, 7])
+    # model.clip.visual = model.clip.visual.to('cuda:1')  # 首先将子模块移到cuda:1
+    # model.clip.visual = nn.DataParallel(model.clip.visual, device_ids=[1, 2, 3])
+    # model.clip.transformer = model.clip.transformer.to('cuda:4')  # 首先将子模块移到cuda:1
+    # model.clip.transformer = nn.DataParallel(model.clip.visual, device_ids=[4, 5, 6, 7])
 
     criterion = nn.CrossEntropyLoss().cuda()
 
@@ -136,6 +154,7 @@ def main(args):
         assert wandb is not None, "Wandb not installed, please install it or run without wandb"
         _ = os.system('wandb login {}'.format(args.wandb_key))
         os.environ['WANDB_API_KEY'] = args.wandb_key
+        # wandb.login()
         wandb.init(
             project=args.wandb_project, 
             group=args.wandb_group, 
@@ -162,7 +181,7 @@ def main(args):
     for epoch in range(0, args.epochs):
         train_stats, best_stats, best_top1 = train_one_epoch(
             model, criterion, train_loader, optimizer, scheduler, epoch, fp16_scaler, cutmix_or_mixup, args,
-            val_loader, best_stats, best_top1, 
+            val_loader, best_stats, best_top1,
         )
 
 #         if args.dataset in ("imagenet", "sun397"):
@@ -210,6 +229,7 @@ def train_one_epoch(
     ):
         if args.is_synth_train and args.is_pooled_fewshot:
             image, label, is_real = batch
+            # print(is_real)
         else:
             image, label = batch
 
@@ -238,12 +258,11 @@ def train_one_epoch(
                     new_label[is_real==0] = label_synth
 
                     image = new_image
-                    label = new_label
+                    label = new_label #这里只是做data argumentation
 
                 else:
                     image, label = cutmix_or_mixup(image, label)
             
-
         it = len(data_loader) * epoch + it  # global training iteration
 
         image = image.squeeze(1).to(torch.float16).cuda(non_blocking=True)
@@ -400,5 +419,7 @@ if __name__ == "__main__":
     try:
         args = get_args()
         main(args)
+        # world_size = torch.cuda.device_count()  # Assumes that we want to use all available GPUs
+        # mp.spawn(main, args=(world_size, args), nprocs=world_size, join=True)
     except Exception as e:
         print(traceback.format_exc())

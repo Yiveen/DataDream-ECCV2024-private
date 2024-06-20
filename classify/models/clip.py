@@ -25,6 +25,7 @@ def get_dataset_name_for_template(dataset):
         "food101": "food ",
         "sun397": "scene ",
         "caltech101": "",
+        "tinyimagenet": "",
     }[dataset]
     return dataset_name
 
@@ -91,7 +92,21 @@ class CLIP(nn.Module):
         print("Tokenizing text...")
 
         texts = []
-        for classname in SUBSET_NAMES[self.dataset]:
+        
+        if self.dataset == 'tinyimagenet':
+            class_names = []
+            real_word_class_file = '/shared-network/yliu/projects/disef/fine-tune/data/tinyimagenet/words.txt' #hard_code here
+            with open(real_word_class_file, 'r') as file:
+                # Use list comprehension to build the class_names list
+                for line in file:
+                    single_class = line.strip().split(maxsplit=1)[1].split(',')[0]
+                    if line.strip().split(maxsplit=1)[0] in SUBSET_NAMES[self.dataset]:
+                        class_names.append(single_class)
+            print(class_names)
+        else:
+            class_names = SUBSET_NAMES[self.dataset]
+                        
+        for classname in class_names:
 
             class_texts = []
             for template in self.templates:

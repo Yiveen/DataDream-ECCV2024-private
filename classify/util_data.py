@@ -206,6 +206,12 @@ SUBSET_NAMES = {
         "vacuum", "window screen", "wing", "head cabbage", "cauliflower",
         "pineapple", "carbonara", "chocolate sauce", "gyromitra", "stinkhorn",
     ],
+    'tinyimagenet':[
+        "n01443537", "n01629819", "n01641577", "n01644900", "n01698640", "n01742172", "n01768244",
+        "n01770393", "n01774384", "n01774750", "n01784675", "n01855672", "n01882714", "n01910747",
+        "n01917289", "n01944390", "n01945685", "n01950731", "n01983481", "n01984695", "n02002724", "n02056570", "n02058221", "n02074367", "n02085620",
+    ],
+    
     'pets': [
         'Abyssinian', 'American Bulldog', 'American Pit Bull Terrier', 'Basset Hound', 'Beagle',
         'Bengal', 'Birman', 'Bombay', 'Boxer', 'British Shorthair',
@@ -445,6 +451,12 @@ SUBSET_NAMES = {
      ]
 }
 
+    # 'tinyimagenet':[
+    #     "goldfish", "European fire salamander", "bullfrog", "tailed frog", "American alligator", "boa constrictor", "trilobite",
+    #     "scorpion", "black widow", "tarantula", "centipede", "goose", "koala", "jellyfish",
+    #     "brain coral", "snail", "slug", "sea slug", "American lobster", "spiny lobster", "black stork", "king penguin", "albatross", "dugong", "Chihuahua",
+    # ],
+
 
 TEMPLATES_SMALL = [
     "a {}photo of a {}",
@@ -544,8 +556,6 @@ def get_class_labels(metadata):
             image_id, class_label_string = line.strip('\n').split(',')
             class_labels[image_id] = int(class_label_string)
     return class_labels
-
-
 
 
 

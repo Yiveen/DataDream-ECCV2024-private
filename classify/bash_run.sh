@@ -1,12 +1,12 @@
 
-GPU="$1"
+# GPU="$1"
 # ARG2="$2"
 
 OUTPUT_DIR="outputs"
 
-DATASET="eurosat"
+DATASET="tinyimagenet"
 
-NIPC=20
+NIPC=200
 LR=1e-4
 MIN_LR=1e-8
 WD=1e-4
@@ -31,7 +31,7 @@ LAMBDA_1=0.8
 # IS_POOLED="${IS_POOLEDS[$ARG2]}"
 
 
-CUDA_VISIBLE_DEVICES=$GPU python main.py \
+CUDA_VISIBLE_DEVICES=0 python main.py \
 --model_type=clip \
 --output_dir=$OUTPUT_DIR \
 --n_img_per_cls=$NIPC \
@@ -55,7 +55,4 @@ CUDA_VISIBLE_DEVICES=$GPU python main.py \
 --fewshot_seed=$FEWSHOT_SEED \
 --is_mix_aug=$IS_MIX_AUG \
 --is_dataset_wise=$IS_DATASET_WISE \
---datadream_lr=$DD_LR \
---datadream_epoch=$DD_EP \
---datadream_train_text_encoder=$DD_TTE \
 $PARAM
